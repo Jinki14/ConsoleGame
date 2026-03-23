@@ -6,56 +6,107 @@
 
 using namespace std;
 
-class Character {
-    public:
+struct Stats {
     int hp;
     int atk;
     int def;
-    bool isDefending;
-    int gauge;
+    int speed;
 
-    Character(int h, int a, int d) {
-        hp = h;
-        atk = a;
-        def = d;
-        isDefending = false;
-        gauge = 0;
-    }
+    float critRate = 0.05f;
+    float critDMG = 1.5f;
+};
 
-    int attack() {
-        return atk;
-    }
+struct BonusStats {
+    float hpPercent = 0;
+    int hp = 0;
+    float atkPercent = 0;
+    int atk = 0;
+    float defPercent = 0;
+    int def = 0;
 
-    void defend() {
-        isDefending = true;
-    }
+    float critRate = 0;
+    float critDMG = 0;
+};
 
-    void takeDamage(int damage) {
-        if(isDefending) {
-            damage = damage * 40 / 100; // 60% 감소
+class Character {
+    public:
+        Stats baseStats;
+        BonusStats BonusStats;
+
+        int currentHp;
+        int gauge;
+
+        Character(Stats s) {
+            baseStats = s;
+            currentHp = getFinalStats().hp;
+            gauge = 0;
         }
 
-        int finalDamage = damage - def;
+        Stats getFinalStats() {
+            Stats final = baseStats;
 
-        if (finalDamage < 0) finalDamage = 0;
+            final.hp = baseStats.hp * (1 + BonusStats.hpPercent) + BonusStats.hp;
+            final.atk = baseStats.atk * (1 + BonusStats.atkPercent) + BonusStats.atk;
+            final.def = baseStats.def * (1 + BonusStats.defPercent) + BonusStats.def;
 
-        hp -= finalDamage;
+            final.critRate = baseStats.critRate + BonusStats.critRate;
+            final.critDMG = baseStats.critDMG + BonusStats.critDMG;
 
-        cout << "받은 피해: " << finalDamage << endl ;
+            return final;
+        }
 
-        isDefending = false;
-    }
+        // int attack() {
+        //     Stats final = getFinalStats();
 
-    void gainGauge() {
-        gauge += 20;
-        if (gauge > 100) gauge = 100;
-    }
+        //     int damage = final.atk;
 
-    int ultimate() {
-        gauge = 0;
-        cout << "🔥 필살기 발동!\n";
-        return atk * 200 / 100; // 200% 데미지
-    }
+        //     if(rand() % 100 < final.critRate*100) {
+        //         cout << "CRIT!\n" ;
+        //         damage = (int)(damage * final.critDMG);
+        //     }
+
+        //     return damage;
+        // }
+
+        void takeDamage(int damage) {
+            currentHp -= damage;
+
+            cout << "받은 피해: " << damage << endl ;
+        }
+
+        void gainGauge() {
+            gauge += 20;
+            if (gauge > 100) gauge = 100;
+        }
+
+        int ultimate() {
+            Stats final = getFinalStats();
+
+            gauge = 0;
+            cout << "🔥\n";
+            return final.atk * 2; // 200% 데미지
+        }
+};
+
+class DamageSystem {
+    public:
+        static int calculateDamage(Character& attacker, Character& target) {
+            Stats atkStats = attacker.getFinalStats();
+            Stats defStats = target.getFinalStats();
+
+            int damage = atkStats.atk;
+
+            // 치명타 대미지 구현부
+            if(rand() % 100 < atkStats.critRate * 100) {
+                cout << "Crit!\n" ;
+                damage = (int)(damage * atkStats.critDMG);
+            }
+
+            int finalDamage = damage - defStats.def;
+            if(finalDamage < 0) finalDamage = 0;
+
+            return finalDamage;
+        }
 };
 
 int main() {
@@ -63,72 +114,70 @@ int main() {
 
     srand(time(0));
 
-    Character player(10000, 2000, 300);
-    Character enemy(10000, 2000, 300);
+    Character player({20000, 2000, 1000, 100, 0.5f, 2.0f});
+    Character enemy({360000, 2000, 500, 90, 0.0f, 1.0f});
 
-    while (player.hp > 0 && enemy.hp > 0) {
-        cout << "\n[플레이어 턴]\n";
-        if (enemy.isDefending) {
-            cout << "적은 방어 중이다!\n";
-        }
-        cout << "1. 공격\n2. 방어\n";
-        if (player.gauge == 100) {
-            cout << "3. 필살기\n";
-        }
-        int input;
-        cin >> input;
+    bool playerTurn = player.stats.speed >= enemy.stats.speed;
 
-        if (input == 1) {
-            int damage = player.attack();
-            enemy.takeDamage(damage);
-            player.gainGauge();
-        }
-        else if (input == 2) {
-            player.defend();
-            cout << "방어 자세!\n";
-            player.gainGauge();
-        }
-        else if (input == 3 && player.gauge == 100) {
-            int damage = player.ultimate();
-            enemy.takeDamage(damage);
-        }
+    while (player.currentHp > 0 && enemy.currentHp > 0) {
+        if (playerTurn) {
+            cout << "\n[플레이어 턴]\n";
+            cout << "1. 공격\n2. 기 모으기\n";
+            if (player.gauge >= 100) {
+                cout << "3. 필살기\n";
+            }
+            int input;
+            cin >> input;
 
-        enemy.isDefending = false;
+            if (input == 1) {
+                int damage = player.attack();
+                enemy.takeDamage(damage);
+                player.gainGauge();
+            }
+            else if (input == 2) {
+                player.gainGauge();
+                player.gainGauge();
+            }
+            else if (input == 3 && player.gauge == 100) {
+                int damage = player.ultimate();
+                enemy.takeDamage(damage);
+            }
 
-        if (enemy.hp <= 0) break;
+            if (enemy.currentHp <= 0) break;
+        } else {
+            cout << "\n[적 턴]\n";
 
-        cout << "\n[적 턴]\n";
+            int action = rand() % 1;
 
-        int action = rand() % 2;
+            if (enemy.gauge == 100) {
+                action = 2; // 필살기 강제 사용 (혹은 확률 조정 가능)
+            }
 
-        if (enemy.gauge == 100) {
-            action = 2; // 필살기 강제 사용 (혹은 확률 조정 가능)
-        }
-
-        if (action == 0) {
-            cout << "적이 공격!\n";
-            int damage = enemy.attack();
-            player.takeDamage(damage);
-            enemy.gainGauge();
-        }
-        else if (action == 1) {
-            cout << "적이 방어!\n";
-            enemy.defend();
-            enemy.gainGauge();
-        }
-        else {
-            cout << "적이 필살기 사용!!!\n";
-            int damage = enemy.ultimate();
-            player.takeDamage(damage);
+            if (action == 0) {
+                cout << "적이 공격!\n";
+                int damage = enemy.attack();
+                player.takeDamage(damage);
+                enemy.gainGauge();
+            }
+            // else if (action == 1) {
+            //     cout << "적이 방어!\n";
+            //     enemy.defend();
+            //     enemy.gainGauge();
+            // }
+            else {
+                cout << "적이 필살기 사용!!!\n";
+                int damage = enemy.ultimate();
+                player.takeDamage(damage);
+            }
         }
 
-        player.isDefending = false;
+        cout << "\n플레이어 HP: " << player.currentHp << endl;
+        cout << "적 HP: " << enemy.currentHp << endl;
 
-        cout << "\n플레이어 HP: " << player.hp << endl;
-        cout << "적 HP: " << enemy.hp << endl;
+        playerTurn = !playerTurn;
     }
 
-    if (player.hp <= 0) cout << "\n패배...\n";
+    if (player.currentHp <= 0) cout << "\n패배...\n";
     else cout << "\n승리!\n";
 
     return 0;
@@ -136,3 +185,13 @@ int main() {
 
 //g++ main.cpp -o game
 //./game
+
+/* 
+ * feat: describe what you added or changed
+ * refactor: describe what you improved
+ * fix: describe the bug
+ * 
+ * chore: minor updates
+ * 
+ * docs: update LOG.md
+ */
