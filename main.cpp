@@ -70,8 +70,8 @@ class Character {
 
         void takeDamage(int damage) {
             currentHp -= damage;
-
-            cout << "받은 피해: " << damage << endl ;
+            cout << "피해: " << damage << endl ;
+            gauge += 5;
         }
 
         void gainGauge() {
@@ -117,7 +117,7 @@ int main() {
     Character player({20000, 2000, 1000, 100, 0.5f, 2.0f});
     Character enemy({360000, 2000, 500, 90, 0.0f, 1.0f});
 
-    bool playerTurn = player.stats.speed >= enemy.stats.speed;
+    bool playerTurn = player.baseStats.speed >= enemy.baseStats.speed;
 
     while (player.currentHp > 0 && enemy.currentHp > 0) {
         if (playerTurn) {
@@ -130,7 +130,7 @@ int main() {
             cin >> input;
 
             if (input == 1) {
-                int damage = player.attack();
+                int damage = DamageSystem::calculateDamage(player, enemy);
                 enemy.takeDamage(damage);
                 player.gainGauge();
             }
@@ -141,6 +141,7 @@ int main() {
             else if (input == 3 && player.gauge == 100) {
                 int damage = player.ultimate();
                 enemy.takeDamage(damage);
+                player.gauge = 0;
             }
 
             if (enemy.currentHp <= 0) break;
@@ -155,7 +156,7 @@ int main() {
 
             if (action == 0) {
                 cout << "적이 공격!\n";
-                int damage = enemy.attack();
+                int damage = DamageSystem::calculateDamage(enemy, player);
                 player.takeDamage(damage);
                 enemy.gainGauge();
             }
