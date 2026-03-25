@@ -30,13 +30,16 @@ struct BonusStats {
 
 class Character {
     public:
+        int level;
+
         Stats baseStats;
         BonusStats BonusStats;
 
         int currentHp;
         int gauge;
 
-        Character(Stats s) {
+        Character(int l, Stats s) {
+            level = l;
             baseStats = s;
             currentHp = getFinalStats().hp;
             gauge = 0;
@@ -90,7 +93,7 @@ class Character {
 
 class DamageSystem {
     public:
-        static int calculateDamage(Character& attacker, Character& target) {
+        static int calculateDamageToEnemy(Character& attacker, Character& target) {
             Stats atkStats = attacker.getFinalStats();
             Stats defStats = target.getFinalStats();
 
@@ -107,6 +110,25 @@ class DamageSystem {
 
             return finalDamage;
         }
+
+        static int calculateDamageToCharacter(Character& attacker, Character& target) {
+            Stats atkStats = attacker.getFinalStats();
+            Stats defStats = target.getFinalStats();
+
+            int damage = atkStats.atk;
+
+            // 치명타 대미지 구현부
+            if(rand() % 100 < atkStats.critRate * 100) {
+                cout << "Crit!\n" ;
+                damage = (int)(damage * atkStats.critDMG);
+            }
+
+            int finalDamage = (int)(damage * (1 - (target.level + 20) / (target.level + attacker.level + 40)));
+            //× (1 - ((적 레벨 + 20) * (1 - 방깎)) / ((적 레벨 + 20) * (1 - 방깎) + 내 레벨 + 20))
+            if(finalDamage < 0) finalDamage = 0;
+
+            return finalDamage;
+        }
 };
 
 int main() {
@@ -114,8 +136,8 @@ int main() {
 
     srand(time(0));
 
-    Character player({20000, 2000, 1000, 100, 0.5f, 2.0f});
-    Character enemy({360000, 2000, 500, 90, 0.0f, 1.0f});
+    Character player(100, {20000, 2000, 1000, 100, 0.5f, 2.0f});
+    Character enemy(150, {360000, 2000, 500, 90, 0.0f, 1.0f});
 
     bool playerTurn = player.baseStats.speed >= enemy.baseStats.speed;
 
@@ -130,7 +152,7 @@ int main() {
             cin >> input;
 
             if (input == 1) {
-                int damage = DamageSystem::calculateDamage(player, enemy);
+                int damage = DamageSystem::calculateDamageToEnemy(player, enemy);
                 enemy.takeDamage(damage);
                 player.gainGauge();
             }
@@ -156,7 +178,7 @@ int main() {
 
             if (action == 0) {
                 cout << "적이 공격!\n";
-                int damage = DamageSystem::calculateDamage(enemy, player);
+                int damage = DamageSystem::calculateDamageToCharacter(enemy, player);
                 player.takeDamage(damage);
                 enemy.gainGauge();
             }
